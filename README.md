@@ -126,6 +126,21 @@ O Swagger tem porta própria para o "Try it out" falar direto com a API: no ende
 
 Postgres do dev: `postgresql://poupamais:poupamais@localhost:5434/poupamais` (schema `poupamais`).
 
+## Abrir pelo celular (modo dev)
+
+1. No `.env`, coloque o IP desta máquina na rede (no WSL: `ip -4 addr show eth0`):
+   ```
+   ORIGENS_DEV_PERMITIDAS=192.168.0.10
+   APP_URL=http://192.168.0.10:8000
+   ```
+   Sem `ORIGENS_DEV_PERMITIDAS`, o `next dev` bloqueia os scripts para esse endereço e o login não funciona. O `APP_URL` faz o link do e-mail de senha abrir no celular.
+2. No WSL, use a rede espelhada (`networkingMode=mirrored` no `.wslconfig` do Windows) e libere a porta no PowerShell como administrador:
+   ```powershell
+   New-NetFirewallHyperVRule -Name PoupaMais8000 -DisplayName "PoupaMais 8000" -Direction Inbound -VMCreatorId '{40E0AC32-46A5-438A-A0B2-2B479E8F2E90}' -Protocol TCP -LocalPorts 8000
+   New-NetFirewallRule -DisplayName "PoupaMais 8000" -Direction Inbound -Protocol TCP -LocalPort 8000 -Action Allow -Profile Private
+   ```
+3. `npm run dev` e abra `http://<IP>:8000` no celular, na mesma rede Wi-Fi (marcada como Privada no Windows).
+
 ## Apontar para uma worktree (`FRONT_DIR` / `BACK_DIR`)
 
 Por padrão o ambiente usa `../PoupaMais_FrontEnd` e `../PoupaMais_BackEnd`. Para testar uma branch, aponte para
