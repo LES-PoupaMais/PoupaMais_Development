@@ -1,0 +1,98 @@
+# Base comum aos modos de desenvolvimento (docker-compose.override.yml, carregado sozinho pelo "docker compose")
+# e "como produção" (docker-compose.prod.yml). Nenhuma porta é publicada aqui: o Compose soma as listas de
+# portas dos arquivos, então cada modo publica as suas (conferido por scripts/conferir-portas.js).
+#
+# Duas redes, como em produção:
+#   interna -> banco, e-mail e API. Sem saída para a internet e sem porta no host.
+#   borda   -> só o que precisa falar com fora: o nginx (portas publicadas) e o front (baixa as fontes do Google).
+# O navegador fala só com o nginx, que repassa para o Next; o Next (BFF e Server Actions) fala com a API.
+name: poupamais
+
+services:
+  db:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_DB: poupamais
+      POSTGRES_USER: ${DB_USER:-poupamais}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-poupamais}
+    volumes:
+      - dados-db:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U \"$$POSTGRES_USER\" -d poupamais"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
+    networks: [interna]
+
+  # SMTP de mentira: guarda os e-mails da API (ex.: link de redefinição de senha)
+  mailpit:
+    image: axllent/mailpit:v1.33.1
+    healthcheck:
+      test: ["CMD", "/mailpit", "readyz"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 5s
+    networks: [interna]
+
+  # API Spring Boot: imagem do Dockerfile do próprio back (HEALTHCHECK dele: porta 8080 aberta = Flyway aplicado)
+  api:
+    build:
+      context: ${BACK_DIR:-../PoupaMais_BackEnd}
+    depends_on:
+      db:
+        condition: service_healthy
+      mailpit:
+        condition: service_healthy
+    environment:
+      DB_URL: jdbc:postgresql://db:5432/poupamais
+      DB_USER: ${DB_USER:-poupamais}
+      DB_PASSWORD: ${DB_PASSWORD:-poupamais}
+      MAIL_HOST: mailpit
+      MAIL_PORT: "1025"
+      MAIL_USER: ""
+      MAIL_PASSWORD: ""
+      MAIL_FROM: ${MAIL_FROM:-PoupaMais <nao-responda@poupamais.local>}
+      JWT_SECRET: ${JWT_SECRET:-troque-este-segredo-de-desenvolvimento-por-um-valor-longo-e-aleatorio}
+      JWT_EXPIRACAO_MIN: ${JWT_EXPIRACAO_MIN:-480}
+    networks: [interna]
+
+  # Next.js: a imagem (dev ou produção) vem de cada modo. API_URL aponta para a API pela rede interna
+  front:
+    init: true
+    depends_on:
+      api:
+        condition: service_healthy
+    environment:
+      API_URL: http://api:8080
+      NEXT_TELEMETRY_DISABLED: "1"
+    networks: [borda, interna]
+
+  # Única porta de entrada. Cada modo monta o seu template do servidor em /etc/nginx/templates
+  nginx:
+    image: nginx:1.30-alpine
+    depends_on:
+      front:
+        condition: service_healthy
+    environment:
+      # Só as variáveis PORTA_* entram nos templates (o resto, como $host, fica para o nginx)
+      NGINX_ENVSUBST_FILTER: ^PORTA_
+    volumes:
+      - ./config/nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./config/nginx/snippets:/etc/nginx/snippets:ro
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://127.0.0.1:8099/saude"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 5s
+    networks: [borda, interna]
+
+networks:
+  interna:
+    internal: true
+  borda: {}
+
+volumes:
+  dados-db:

@@ -1,0 +1,18 @@
+# Configuração local (o .env.example é versionado)
+.env
+.env.*
+!.env.example
+
+# HTTPS local: CA e certificado gerados por "npm run certs" (a chave da CA nunca sai da máquina)
+certs/
+*.pem
+*.key
+*.crt
+
+# Node
+node_modules/
+npm-debug.log*
+
+# Sistema
+.DS_Store
+Thumbs.db
