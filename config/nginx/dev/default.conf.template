@@ -1,0 +1,51 @@
+# Desenvolvimento. Template: o entrypoint do nginx troca ${PORTA_SWAGGER} e grava em conf.d/default.conf.
+# Upstreams em variáveis (resolvidos na hora, ver resolver no nginx.conf).
+
+# App (APP_PORT): o navegador fala só com o Next, inclusive /api (BFF do Next, que repassa para a API)
+server {
+    listen 80 default_server;
+    server_name _;
+
+    # Uploads (CSV e foto de perfil) até 2 MB, mais o envelope do multipart; igual ao back (max-request-size 3MB)
+    client_max_body_size 3m;
+
+    # Atalho para o Swagger, que tem porta própria para o "Try it out" falar direto com a API
+    location ~ ^/swagger/?$ {
+        return 302 http://$host:${PORTA_SWAGGER}/swagger-ui.html;
+    }
+
+    location / {
+        set $front http://front:3000;
+        proxy_pass $front;
+        include /etc/nginx/snippets/proxy.conf;
+        # A primeira visita a cada página compila sob demanda no "next dev" e pode passar de 1 minuto
+        proxy_read_timeout 300s;
+    }
+}
+
+# Swagger da API (SWAGGER_PORT, só 127.0.0.1). Só existe no dev
+server {
+    listen 8081;
+    client_max_body_size 3m;
+
+    location = / {
+        return 302 /swagger-ui.html;
+    }
+
+    location / {
+        set $api http://api:8080;
+        proxy_pass $api;
+        include /etc/nginx/snippets/proxy.conf;
+    }
+}
+
+# Mailpit (MAILPIT_PORT, só 127.0.0.1)
+server {
+    listen 8025;
+
+    location / {
+        set $mailpit http://mailpit:8025;
+        proxy_pass $mailpit;
+        include /etc/nginx/snippets/proxy.conf;
+    }
+}

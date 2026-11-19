@@ -1,0 +1,14 @@
+# syntax=docker/dockerfile:1
+# Front em desenvolvimento ("next dev"). O código vem do bind mount de FRONT_DIR; a imagem só traz as
+# dependências, instaladas para Linux/musl. O contexto nomeado "app" é o FRONT_DIR (additional_contexts).
+FROM node:26-alpine
+ENV NEXT_TELEMETRY_DISABLED=1
+WORKDIR /app
+# Usuário node (uid 1000): os arquivos que o "next dev" escrever no bind mount ficam com o dono do host
+RUN chown node:node /app
+USER node
+COPY --from=app --chown=node:node package.json package-lock.json ./
+# .next criado aqui para o volume anônimo nascer com o dono certo
+RUN npm ci --no-audit --no-fund && npm cache clean --force && mkdir -p .next
+EXPOSE 3000
+CMD ["node_modules/.bin/next", "dev", "--hostname", "0.0.0.0", "--port", "3000"]

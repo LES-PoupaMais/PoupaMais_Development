@@ -1,0 +1,38 @@
+{
+  "nginx": {
+    "title": "Nginx",
+    "description": "Única porta de entrada: app → front; Swagger, Mailpit e Postgres em portas só de 127.0.0.1",
+    "links": [{ "label": "Abrir app", "url": "http://{host}:{appPort}/login" }]
+  },
+  "front": {
+    "title": "Front (Next.js)",
+    "description": "next dev com hot reload sobre o código de FRONT_DIR. BFF em /api e Server Actions falam com a API",
+    "links": [
+      { "label": "Login", "url": "http://{host}:{appPort}/login" },
+      { "label": "Cadastro", "url": "http://{host}:{appPort}/cadastro" }
+    ]
+  },
+  "api": {
+    "title": "API (Spring Boot)",
+    "description": "Imagem do Dockerfile do back (BACK_DIR), só na rede interna. Mudou o back? Reconstrua: npm run dev",
+    "links": [{ "label": "Swagger", "url": "http://{host}:{swaggerPort}/swagger-ui.html" }],
+    "copy": [{ "label": "API_URL (rede interna)", "value": "http://api:8080" }]
+  },
+  "db": {
+    "title": "PostgreSQL 17",
+    "description": "Banco de desenvolvimento (schema poupamais, criado pelo Flyway). Volume dados-db",
+    "copy": [
+      { "label": "Conexão", "value": "postgresql://{dbUser}:{dbPassword}@localhost:{dbPort}/poupamais" },
+      { "label": "JDBC", "value": "jdbc:postgresql://localhost:{dbPort}/poupamais" }
+    ]
+  },
+  "mailpit": {
+    "title": "E-mails (Mailpit)",
+    "description": "SMTP de desenvolvimento: guarda os e-mails da API, como o link de redefinição de senha",
+    "links": [
+      { "label": "Caixa de entrada", "url": "http://{host}:{mailpitPort}/" },
+      { "label": "API", "url": "http://{host}:{mailpitPort}/api/v1/messages" }
+    ],
+    "copy": [{ "label": "SMTP (rede interna)", "value": "mailpit:1025" }]
+  }
+}
