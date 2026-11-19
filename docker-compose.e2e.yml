@@ -1,0 +1,56 @@
+# PREPARADO, AINDA NÃO USADO: pilha para a futura suíte E2E do front contra a API real.
+# Arquivo independente (sem o docker-compose.yml): o front e o navegador rodam no host, pelo Playwright,
+# com API_URL=http://localhost:${E2E_API_PORT}. Banco em tmpfs: cada "e2e:reset" começa do zero.
+#   npm run e2e:up | e2e:down | e2e:reset
+name: poupamais-e2e
+
+services:
+  db:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_DB: poupamais
+      POSTGRES_USER: poupamais
+      POSTGRES_PASSWORD: poupamais
+    tmpfs:
+      - /var/lib/postgresql/data
+    ports:
+      # Para a suíte conferir/limpar dados direto no banco, se precisar
+      - "127.0.0.1:${E2E_DB_PORT:-5435}:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U poupamais -d poupamais"]
+      interval: 3s
+      timeout: 3s
+      retries: 20
+
+  mailpit:
+    image: axllent/mailpit:v1.33.1
+    ports:
+      # Interface e API HTTP (a suíte lê o link de redefinição de senha em /api/v1/messages)
+      - "127.0.0.1:${E2E_MAILPIT_PORT:-8525}:8025"
+    healthcheck:
+      test: ["CMD", "/mailpit", "readyz"]
+      interval: 3s
+      timeout: 3s
+      retries: 10
+
+  api:
+    build:
+      context: ${BACK_DIR:-../PoupaMais_BackEnd}
+    depends_on:
+      db:
+        condition: service_healthy
+      mailpit:
+        condition: service_healthy
+    environment:
+      DB_URL: jdbc:postgresql://db:5432/poupamais
+      DB_USER: poupamais
+      DB_PASSWORD: poupamais
+      MAIL_HOST: mailpit
+      MAIL_PORT: "1025"
+      MAIL_FROM: PoupaMais <nao-responda@poupamais.local>
+      JWT_SECRET: segredo-so-para-os-testes-e2e-com-tamanho-suficiente-para-o-hmac
+      FRONT_URL: http://localhost:${E2E_FRONT_PORT:-3200}
+      CORS_ORIGINS: http://localhost:${E2E_FRONT_PORT:-3200}
+      SWAGGER_HABILITADO: "false"
+    ports:
+      - "127.0.0.1:${E2E_API_PORT:-8580}:8080"
