@@ -5,8 +5,8 @@
 services:
   api:
     environment:
-      # Link do e-mail de redefinição de senha: a porta do app no nginx
-      FRONT_URL: http://localhost:${APP_PORT:-8000}
+      # Link do e-mail de redefinição de senha: a porta do app no nginx (APP_URL troca, ex.: IP da rede)
+      FRONT_URL: ${APP_URL:-http://localhost:${APP_PORT:-8000}}
       CORS_ORIGINS: http://localhost:${APP_PORT:-8000}
       SWAGGER_HABILITADO: "true"
 
@@ -27,6 +27,8 @@ services:
     environment:
       # Watcher por polling desligado: no WSL o bind mount vem do ext4 e o inotify funciona
       WATCHPACK_POLLING: "false"
+      # Endereços além de localhost que o "next dev" deixa carregar os scripts (ex.: IP da rede, para o celular)
+      ORIGENS_DEV_PERMITIDAS: ${ORIGENS_DEV_PERMITIDAS:-}
     healthcheck:
       # Porta aberta basta: um GET obrigaria o "next dev" a compilar a página a cada verificação
       test: ["CMD", "nc", "-z", "127.0.0.1", "3000"]
