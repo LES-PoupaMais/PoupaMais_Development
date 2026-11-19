@@ -1,0 +1,73 @@
+<!doctype html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>PoupaMais · painel</title>
+    <link rel="icon" href="icone.svg" type="image/svg+xml" />
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <header class="topo">
+      <div class="marca">
+        <img src="icone.svg" alt="" width="28" height="28" />
+        <div>
+          <h1>PoupaMais <span class="etiqueta">dev</span></h1>
+          <p id="projeto" class="fraco pequeno">conectando ao Docker…</p>
+        </div>
+      </div>
+      <div class="resumo">
+        <span id="resumo" class="pilula">—</span>
+        <span id="atualizado" class="fraco pequeno"></span>
+      </div>
+    </header>
+
+    <div id="erro" class="aviso" role="alert" hidden></div>
+
+    <main class="layout">
+      <section aria-label="Serviços">
+        <div id="servicos" class="grade"></div>
+      </section>
+
+      <section class="logs" aria-label="Logs">
+        <div class="logs-topo">
+          <div id="abas" class="abas" role="tablist"></div>
+          <div class="logs-ferramentas">
+            <input id="filtro" type="search" placeholder="Filtrar…" aria-label="Filtrar logs" />
+            <label class="opcao"><input id="seguir" type="checkbox" checked /> seguir</label>
+            <label class="opcao"><input id="quebrar" type="checkbox" /> quebrar linhas</label>
+            <button id="limpar" class="botao discreto" type="button">Limpar</button>
+          </div>
+        </div>
+        <div id="logs-status" class="logs-status fraco pequeno">Escolha um serviço para ver os logs.</div>
+        <pre id="saida" class="saida" tabindex="0"></pre>
+      </section>
+    </main>
+
+    <div id="toast" class="toast" role="status" aria-live="polite" hidden></div>
+
+    <template id="modelo-cartao">
+      <article class="cartao">
+        <header class="cartao-topo">
+          <span class="ponto" aria-hidden="true"></span>
+          <div class="cartao-titulo">
+            <h2></h2>
+            <code class="nome"></code>
+          </div>
+          <span class="estado pilula"></span>
+        </header>
+        <p class="descricao fraco"></p>
+        <p class="status pequeno fraco"></p>
+        <ul class="portas"></ul>
+        <div class="links"></div>
+        <footer class="acoes">
+          <button class="botao" data-acao="logs" type="button">Logs</button>
+          <button class="botao" data-acao="restart" type="button">Reiniciar</button>
+          <button class="botao" data-acao="alternar" type="button"></button>
+        </footer>
+      </article>
+    </template>
+
+    <script src="app.js"></script>
+  </body>
+</html>
