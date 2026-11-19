@@ -1,0 +1,50 @@
+name: CI
+
+on:
+  push:
+    branches: [main, development]
+  pull_request:
+
+# Um push novo no mesmo PR cancela a execução anterior
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  testes:
+    name: Painel e scripts
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+
+      # Mesma versão da imagem do painel (node:26-alpine)
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '26'
+
+      - name: Sintaxe (node --check)
+        run: npm run check
+
+      # node:test, sem dependências: não há npm ci
+      - name: Testes
+        run: npm test
+
+  configuracao:
+    name: Compose e nginx
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '26'
+
+      # docker compose config -q dos três modos, portas publicadas e nginx -t de dev e de produção.
+      # Não precisa do código do front e do back (../PoupaMais_*): nada é construído aqui
+      - name: Configuração
+        run: sh scripts/conferir-config.sh

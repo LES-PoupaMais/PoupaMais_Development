@@ -1,0 +1,34 @@
+{
+  "name": "poupamais-development",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Ambiente integrado do PoupaMais: Docker Compose (dev, como produção e E2E), Nginx e painel de desenvolvimento",
+  "license": "UNLICENSED",
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "dev": "docker compose up -d --build --wait --wait-timeout 600 && node scripts/enderecos.js dev",
+    "dev:down": "docker compose down",
+    "dev:reset": "docker compose down -v --remove-orphans && docker compose up -d --build --wait --wait-timeout 600 --renew-anon-volumes && node scripts/enderecos.js dev",
+    "logs": "docker compose logs -f --tail 200",
+    "logs:front": "docker compose logs -f --tail 200 front",
+    "logs:api": "docker compose logs -f --tail 200 api",
+    "logs:nginx": "docker compose logs -f --tail 200 nginx",
+    "logs:db": "docker compose logs -f --tail 200 db",
+    "logs:mailpit": "docker compose logs -f --tail 200 mailpit",
+    "logs:painel": "docker compose logs -f --tail 200 painel",
+    "logs:prod": "docker compose -f docker-compose.yml -f docker-compose.prod.yml logs -f --tail 200",
+    "prod": "npm run certs && docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d --build --wait --wait-timeout 900 && node scripts/enderecos.js prod",
+    "prod:down": "docker compose -f docker-compose.yml -f docker-compose.prod.yml down",
+    "prod:reset": "docker compose -f docker-compose.yml -f docker-compose.prod.yml down -v --remove-orphans && npm run prod",
+    "status": "docker compose ls -a --filter name=poupamais && docker compose ps -a && docker compose -f docker-compose.yml -f docker-compose.prod.yml ps -a",
+    "certs": "sh scripts/gerar-certificados.sh",
+    "e2e:up": "docker compose -f docker-compose.e2e.yml up -d --build --wait --wait-timeout 600 && node scripts/enderecos.js e2e",
+    "e2e:down": "docker compose -f docker-compose.e2e.yml down -v",
+    "e2e:reset": "docker compose -f docker-compose.e2e.yml down -v && npm run e2e:up",
+    "test": "node --test tests/",
+    "check": "node --check config/painel/server.js && node --check config/painel/public/app.js && node --check scripts/conferir-portas.js && node --check scripts/enderecos.js",
+    "config": "sh scripts/conferir-config.sh"
+  }
+}
