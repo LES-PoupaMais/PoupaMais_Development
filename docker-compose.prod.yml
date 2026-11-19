@@ -1,0 +1,49 @@
+# Modo "como produção", local:
+#   docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d --build --wait   (ou: npm run prod)
+# - Next em build de produção (next build + next start), imagem multi-stage com usuário não-root
+# - nginx com HTTPS (certificado de scripts/gerar-certificados.sh), redirecionamento HTTP -> HTTPS,
+#   HSTS, nosniff, X-Frame-Options e gzip
+# - API com o Swagger desligado; sem painel, sem Postgres no host
+# Projeto separado (poupamais-prod): não derruba o modo dev nem divide o banco com ele.
+name: poupamais-prod
+
+services:
+  db:
+    restart: unless-stopped
+
+  mailpit:
+    restart: unless-stopped
+
+  api:
+    restart: unless-stopped
+    environment:
+      FRONT_URL: https://${PROD_HOST:-poupamais.localhost}:${PROD_HTTPS_PORT:-8443}
+      CORS_ORIGINS: https://${PROD_HOST:-poupamais.localhost}:${PROD_HTTPS_PORT:-8443}
+      SWAGGER_HABILITADO: "false"
+
+  front:
+    restart: unless-stopped
+    build:
+      context: ./config/front
+      dockerfile: Dockerfile
+      additional_contexts:
+        app: ${FRONT_DIR:-../PoupaMais_FrontEnd}
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://127.0.0.1:3000/login"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 15s
+
+  nginx:
+    restart: unless-stopped
+    ports:
+      - "${PROD_HTTP_PORT:-8480}:80"
+      - "${PROD_HTTPS_PORT:-8443}:443"
+      # Caixa de e-mails (link de redefinição de senha): só nesta máquina
+      - "127.0.0.1:${PROD_MAILPIT_PORT:-8402}:8025"
+    environment:
+      PORTA_HTTPS: ${PROD_HTTPS_PORT:-8443}
+    volumes:
+      - ./config/nginx/prod:/etc/nginx/templates:ro
+      - ./certs:/etc/nginx/certs:ro
