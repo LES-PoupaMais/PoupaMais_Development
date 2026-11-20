@@ -49,8 +49,8 @@ services:
       MAIL_PORT: "1025"
       MAIL_FROM: PoupaMais <nao-responda@poupamais.local>
       JWT_SECRET: segredo-so-para-os-testes-e2e-com-tamanho-suficiente-para-o-hmac
-      FRONT_URL: http://localhost:${E2E_FRONT_PORT:-3200}
-      CORS_ORIGINS: http://localhost:${E2E_FRONT_PORT:-3200}
+      FRONT_URL: http://localhost:${E2E_FRONT_PORT:-3130}
+      CORS_ORIGINS: http://localhost:${E2E_FRONT_PORT:-3130}
       SWAGGER_HABILITADO: "false"
     ports:
       - "127.0.0.1:${E2E_API_PORT:-8580}:8080"
