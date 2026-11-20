@@ -201,12 +201,21 @@ NODE_EXTRA_CA_CERTS=$PWD/certs/poupamais-ca.crt node script.js
 Para remover: `certmgr.msc` → *Autoridades de Certificação Raiz Confiáveis* → *PoupaMais CA local*.
 A chave da CA (`certs/poupamais-ca.key`) só existe nesta máquina: não a compartilhe.
 
-## Pilha E2E (preparada, ainda sem uso)
+## Pilha E2E
 
 `docker-compose.e2e.yml` (projeto `poupamais-e2e`) sobe só `db` (em `tmpfs`, some no `down`), `mailpit` e `api`,
-em portas próprias de 127.0.0.1. A ideia é a futura suíte E2E do front rodar o Next e o Playwright no host com
-`API_URL=http://localhost:8580` e ler os e-mails pela API do Mailpit (`http://localhost:8525/api/v1/messages`).
-Os atalhos `e2e:up`, `e2e:down` e `e2e:reset` já existem; a suíte ainda não.
+em portas próprias de 127.0.0.1. A suíte `e2e/api-real` do front roda o Next (build de produção, porta 3130) e o
+Playwright no host com `API_URL=http://localhost:8580` e lê os e-mails pela API do Mailpit
+(`http://localhost:8525/api/v1/messages`).
+
+```bash
+npm run e2e:up                      # aqui
+npm run test:e2e:api-real           # no PoupaMais_FrontEnd
+npm run e2e:down                    # aqui (apaga o banco da pilha)
+```
+
+`E2E_FRONT_PORT` (padrão 3130) precisa ser a mesma porta do front da suíte: é para ela que apontam o link do e-mail
+de senha e o CORS da API. `npm run e2e:reset` recria a pilha do zero.
 
 ## Estrutura
 
@@ -215,7 +224,7 @@ Os atalhos `e2e:up`, `e2e:down` e `e2e:reset` já existem; a suíte ainda não.
 ├── docker-compose.yml           # base: serviços e redes, sem portas
 ├── docker-compose.override.yml  # modo dev (carregado sozinho pelo "docker compose")
 ├── docker-compose.prod.yml      # modo como produção
-├── docker-compose.e2e.yml       # pilha E2E (preparada)
+├── docker-compose.e2e.yml       # pilha E2E (suíte e2e/api-real do front)
 ├── config/
 │   ├── front/                   # Dockerfile (produção) e Dockerfile.dev do Next
 │   ├── nginx/                   # nginx.conf, snippets/, dev/ e prod/ (templates), stream-dev/ (Postgres)
