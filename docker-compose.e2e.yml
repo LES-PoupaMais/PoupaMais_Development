@@ -1,4 +1,4 @@
-# PREPARADO, AINDA NÃO USADO: pilha para a futura suíte E2E do front contra a API real.
+# Pilha da suíte E2E do front contra a API real (e2e/api-real, "npm run test:e2e:api-real" no PoupaMais_FrontEnd).
 # Arquivo independente (sem o docker-compose.yml): o front e o navegador rodam no host, pelo Playwright,
 # com API_URL=http://localhost:${E2E_API_PORT}. Banco em tmpfs: cada "e2e:reset" começa do zero.
 #   npm run e2e:up | e2e:down | e2e:reset

@@ -29,7 +29,7 @@ poupamais/
 | `npm run prod:down` / `prod:reset` / `logs:prod` | Derruba / recria do zero / logs do modo como produção |
 | `npm run status` | Projetos do PoupaMais no Docker e os containers de cada modo |
 | `npm run certs` | Gera a CA local e o certificado do nginx em `certs/` (`-- --forcar` refaz o do nginx) |
-| `npm run e2e:up` / `e2e:down` / `e2e:reset` | Pilha da futura suíte E2E (ver abaixo) |
+| `npm run e2e:up` / `e2e:down` / `e2e:reset` | Pilha da suíte E2E do front contra a API real (ver abaixo) |
 | `npm test` | Testes do painel e dos scripts (`node:test`, Docker falso) |
 | `npm run check` / `npm run config` | `node --check` dos scripts / `config -q` dos três modos, portas e `nginx -t` |
 
@@ -71,7 +71,7 @@ O `docker compose up` puro também funciona: sem `-f`, o Compose junta `docker-c
 | --- | --- |
 | `db` | Postgres 17 com healthcheck; volume `poupamais_dados-db` |
 | `mailpit` | Mailpit `v1.33.1` (SMTP `mailpit:1025` na rede interna) |
-| `api` | Imagem do `Dockerfile` do back (`BACK_DIR`), Swagger ligado; espera `db` e `mailpit` saudáveis |
+| `api` | Imagem do `Dockerfile` do back (`BACK_DIR`), Swagger ligado; espera `db` e `mailpit` saudáveis. Saudável quando `GET /actuator/health` responde `{"status":"UP"}` (`HEALTHCHECK` do próprio `Dockerfile`) |
 | `front` | `next dev` com bind mount de `FRONT_DIR` (hot reload), uid 1000, volumes anônimos para `node_modules` e `.next`, `API_URL=http://api:8080` |
 | `nginx` | Na frente do front; também publica Swagger, Mailpit e Postgres em 127.0.0.1 |
 | `painel` | Painel de desenvolvimento (abaixo), em 127.0.0.1 |
@@ -94,6 +94,10 @@ para recriar o volume de `node_modules`.
 É um projeto Compose separado, com banco próprio: dá para ter os dois modos no ar ao mesmo tempo.
 Com `NODE_ENV=production` o front grava o cookie `pm_token` com `Secure`, que só trafega por HTTPS — por isso
 este modo é o lugar de conferir sessão, redirecionamentos e cabeçalhos antes de uma entrega.
+
+**PWA:** é também o modo para instalar o PoupaMais como app. O service worker só é registrado no build de produção,
+e o navegador só oferece instalar em HTTPS (ou em `localhost`). No modo dev, pelo IP da rede (`http://<IP>:8000`),
+não instala. No computador, abra `https://poupamais.localhost:8443` com a CA local confiada (ver "HTTPS local").
 
 ### Painel (só no dev)
 
@@ -140,6 +144,9 @@ Postgres do dev: `postgresql://poupamais:poupamais@localhost:5434/poupamais` (sc
    New-NetFirewallRule -DisplayName "PoupaMais 8000" -Direction Inbound -Protocol TCP -LocalPort 8000 -Action Allow -Profile Private
    ```
 3. `npm run dev` e abra `http://<IP>:8000` no celular, na mesma rede Wi-Fi (marcada como Privada no Windows).
+
+Assim o app abre e funciona, mas não instala como PWA (o navegador exige HTTPS). Para instalar no celular, é preciso
+HTTPS com um certificado que o celular confie (por exemplo, depois de um deploy com HTTPS).
 
 ## Apontar para uma worktree (`FRONT_DIR` / `BACK_DIR`)
 
@@ -238,6 +245,7 @@ de senha e o CORS da API. `npm run e2e:reset` recria a pilha do zero.
 
 - **Porta ocupada**: troque no `.env` (`APP_PORT`, `PROD_HTTPS_PORT` etc.).
 - **`api` não fica saudável**: `npm run logs:api`. Na primeira subida o Maven baixa as dependências (alguns minutos).
+  O healthcheck consulta `GET /actuator/health` dentro do container: `DOWN` (503) quase sempre é o banco fora do ar.
 - **Painel sem acesso ao Docker**: ele precisa de `/var/run/docker.sock`; a mensagem na página diz o motivo.
 - **Navegador forçando HTTPS em `http://localhost`**: algum HSTS antigo para `localhost`; apague em
   `chrome://net-internals/#hsts` (*Delete domain security policies*).
