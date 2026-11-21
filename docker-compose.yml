@@ -36,7 +36,8 @@ services:
       start_period: 5s
     networks: [interna]
 
-  # API Spring Boot: imagem do Dockerfile do próprio back (HEALTHCHECK dele: porta 8080 aberta = Flyway aplicado)
+  # API Spring Boot: imagem do Dockerfile do próprio back. HEALTHCHECK dele: GET /actuator/health responde {"status":"UP"}
+  # (contexto no ar, Flyway aplicado e banco acessível; 503 se o banco cair)
   api:
     build:
       context: ${BACK_DIR:-../PoupaMais_BackEnd}
