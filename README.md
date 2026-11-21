@@ -4,6 +4,9 @@ Ambiente integrado do PoupaMais: sobe banco, e-mail, API, front e Nginx com um c
 (**desenvolvimento** e **como produção**), com um painel para acompanhar tudo. O código da aplicação fica nos
 repositórios irmãos `PoupaMais_BackEnd` e `PoupaMais_FrontEnd`; aqui só há orquestração.
 
+**No ar:** https://poupamais-one.vercel.app (front na Vercel, API no Render, banco no Neon). Passo a passo na seção
+[Deploy](#deploy).
+
 ```
 poupamais/
 ├── PoupaMais_BackEnd/      ← BACK_DIR  (Dockerfile da API)
@@ -97,7 +100,12 @@ este modo é o lugar de conferir sessão, redirecionamentos e cabeçalhos antes 
 
 **PWA:** é também o modo para instalar o PoupaMais como app. O service worker só é registrado no build de produção,
 e o navegador só oferece instalar em HTTPS (ou em `localhost`). No modo dev, pelo IP da rede (`http://<IP>:8000`),
-não instala. No computador, abra `https://poupamais.localhost:8443` com a CA local confiada (ver "HTTPS local").
+não instala. No computador, abra `https://poupamais.localhost:8443` com a CA local confiada (ver "HTTPS local"). No
+celular, instale pelo site publicado (ver "Deploy").
+
+**Cabeçalhos de segurança:** o nginx põe HSTS, `X-Content-Type-Options`, `X-Frame-Options`, `Referrer-Policy` e
+`Permissions-Policy`, e esconde os mesmos cabeçalhos que o Next manda (`next.config.ts` do front, que é quem os põe na Vercel),
+para não sair cada um duas vezes.
 
 ### Painel (só no dev)
 
@@ -145,8 +153,8 @@ Postgres do dev: `postgresql://poupamais:poupamais@localhost:5434/poupamais` (sc
    ```
 3. `npm run dev` e abra `http://<IP>:8000` no celular, na mesma rede Wi-Fi (marcada como Privada no Windows).
 
-Assim o app abre e funciona, mas não instala como PWA (o navegador exige HTTPS). Para instalar no celular, é preciso
-HTTPS com um certificado que o celular confie (por exemplo, depois de um deploy com HTTPS).
+Assim o app abre e funciona, mas não instala como PWA (o navegador exige HTTPS). Para instalar no celular, use o site
+publicado (https://poupamais-one.vercel.app; ver "Deploy").
 
 ## Apontar para uma worktree (`FRONT_DIR` / `BACK_DIR`)
 
@@ -240,6 +248,127 @@ de senha e o CORS da API. `npm run e2e:reset` recria a pilha do zero.
 ├── tests/                       # node:test do painel e dos scripts
 └── .github/workflows/ci.yml     # node --check, npm test, config -q dos modos e nginx -t
 ```
+
+## Deploy
+
+O PoupaMais está publicado com serviços gratuitos (21/11/2026). Este é o passo a passo para refazer do zero.
+
+| Peça | Serviço | Endereço |
+| --- | --- | --- |
+| Front (Next.js) | **Vercel** (Hobby) | https://poupamais-one.vercel.app |
+| API (Spring Boot, `Dockerfile` do back) | **Render** (Web Service, Free) | https://poupamais-backend.onrender.com |
+| Banco (Postgres 17) | **Neon** (Free, AWS US East 1) | acessado só pela API |
+| E-mail (redefinir senha) | **Brevo** (SMTP, 300 e-mails/dia) | `smtp-relay.brevo.com:2525` |
+| Manter a API acordada | **cron-job.org** | chama `/actuator/health` a cada 10 min |
+
+- O navegador só fala com a Vercel. O Next (BFF) chama a API no servidor, então o cookie de login fica no domínio da Vercel
+  e o navegador nunca vê o endereço da API. A foto de perfil fica no banco: não há serviço de arquivos.
+- A Vercel e o Render publicam a branch **`main`** sozinhos a cada merge. As migrações do Flyway rodam quando a API sobe.
+- Ordem: Neon → Brevo → Render → Vercel → voltar ao Render com a URL da Vercel → testar.
+- **Nunca** ponha senha ou chave no repositório nem no chat: elas vão só nos painéis dos serviços.
+
+### 1. Banco no Neon
+
+1. Crie a conta em https://neon.tech (com o GitHub) e um projeto: nome `poupamais`, região **AWS US East 1 (N. Virginia)**,
+   **Postgres 17**, database `poupamais`. Deixe desligados os outros serviços (Object storage, Functions, Auth etc.).
+2. Ignore o "prompt para agente" que o Neon oferece (ele é para apps Node que falam direto com o banco): clique em
+   **Go to project**.
+3. Em **Connect**: branch `production`, database `poupamais`, **Connection pooling desligado** (o Flyway precisa da conexão
+   direta). Da string `postgresql://USUARIO:SENHA@HOST/poupamais?sslmode=require` saem:
+   - `DB_URL` = `jdbc:postgresql://HOST/poupamais?sslmode=require` (sem usuário e senha; tire o `&channel_binding=require`,
+     se vier);
+   - `DB_USER` = `USUARIO` (normalmente `neondb_owner`);
+   - `DB_PASSWORD` = `SENHA`.
+
+Não precisa criar tabela: a API cria o schema `poupamais` na primeira subida.
+
+### 2. E-mail no Brevo
+
+O plano Free do Render bloqueia as portas de e-mail 25, 465 e 587. O Brevo aceita a **2525**.
+
+1. Crie a conta em https://www.brevo.com.
+2. **Configurações → Remetentes, domínios e IPs dedicados → Remetentes → Adicionar remetente**: nome `PoupaMais` e um e-mail
+   seu; confirme com o código que chega nesse e-mail.
+3. **Configurações → SMTP e API → aba SMTP → Gerar nova chave SMTP**. Anote o **Login** (`xxxx@smtp-brevo.com`, não é o seu
+   e-mail) e a **chave SMTP** (aparece uma vez só; não use a "chave de API").
+
+Com remetente Gmail o e-mail pode cair no spam: avise quem for testar.
+
+### 3. API no Render
+
+1. Em https://dashboard.render.com (login com o GitHub): **+ New → Web Service**, autorize a organização **LES-PoupaMais**
+   e escolha `PoupaMais_BackEnd`.
+2. Name `poupamais-backend` · Language **Docker** · Branch `main` · Region **Virginia (US East)** · Instance **Free**.
+3. **Environment Variables** (o botão *Add from .env* aceita o bloco; o `SPRING_APPLICATION_JSON` vai à mão, por causa das
+   aspas):
+
+   ```
+   PORT=8080
+   DB_URL=jdbc:postgresql://<host-do-neon>/poupamais?sslmode=require
+   DB_USER=<usuario-do-neon>
+   DB_PASSWORD=<senha-do-neon>
+   JWT_SECRET=<saida de: openssl rand -base64 64 | tr -d '\n'>
+   JWT_EXPIRACAO_MIN=480
+   MAIL_HOST=smtp-relay.brevo.com
+   MAIL_PORT=2525
+   MAIL_USER=<login-smtp-do-brevo>
+   MAIL_PASSWORD=<chave-smtp-do-brevo>
+   MAIL_FROM=PoupaMais <email-verificado-no-brevo>
+   SWAGGER_HABILITADO=false
+   FRONT_URL=https://poupamais-one.vercel.app
+   CORS_ORIGINS=https://poupamais-one.vercel.app
+   ```
+
+   e `SPRING_APPLICATION_JSON` = `{"spring":{"mail":{"properties":{"mail.smtp.auth":"true","mail.smtp.starttls.enable":"true"}}}}`
+   (liga a autenticação e o STARTTLS, que o Brevo exige e o `application.yml` não traz).
+4. **Advanced → Health Check Path:** `/actuator/health`. O resto fica no padrão (sem Docker Command nem Pre-Deploy Command;
+   Auto-Deploy **On Commit**).
+5. **Deploy Web Service.** O primeiro build leva de 5 a 10 min e a subida do Spring de 2 a 3 min (CPU pequena do Free). No log:
+   `Successfully applied 3 migrations to schema "poupamais"` e `Tomcat started on port 8080`. Confira
+   `https://poupamais-backend.onrender.com/actuator/health` → `{"status":"UP"}`.
+
+Os limites do Free (sem disco, SSH, escala ou jobs avulsos) não atrapalham: os dados ficam no Neon e as migrações rodam na
+subida. O que pesa é o sono: depois de ~15 min sem uso, a próxima chamada espera a API subir de novo.
+
+### 4. Manter a API acordada (cron-job.org)
+
+Em https://cron-job.org, **Create cronjob**: título `PoupaMais API acordada`, URL
+`https://poupamais-backend.onrender.com/actuator/health` (não a raiz `/`, que não tem página), **Every 10 minutes**, método GET.
+Notificações só de falha. As 750 horas por mês do Free cobrem um serviço ligado o mês inteiro. O primeiro TEST RUN pode dar
+*timeout* se a API estiver dormindo (o cron-job espera ~30 s): espere 3 min e teste de novo.
+
+### 5. Front na Vercel
+
+1. **Add New → Project → Import** `LES-PoupaMais/PoupaMais_FrontEnd` (se a organização não aparecer, *Adjust GitHub App
+   Permissions*).
+2. Project Name `poupamais` (o nome livre virou `poupamais-one`) · Framework **Next.js** · Root `./` · build no padrão.
+3. **Environment Variables:** só `API_URL=https://poupamais-backend.onrender.com` (sem barra no fim).
+4. **Deploy.** Se o build reclamar da versão do Node (o `.nvmrc` pede 26 e a Vercel não lê esse arquivo): **Settings → Build and
+   Deployment → Node.js Version**, a mais nova da lista, e **Redeploy**.
+5. Volte ao Render e confira `FRONT_URL` e `CORS_ORIGINS` com a URL exata da Vercel (o `FRONT_URL` monta o link do e-mail de
+   redefinir senha).
+
+### 6. Testar
+
+Roteiro da demo no site publicado (cadastro → categoria pelo campo → lançamento com 2 categorias → importar CSV com linha
+inválida → baixar linhas ignoradas → filtrar e tirar do saldo → dashboard → exportar CSV e Excel), mais:
+
+- **Esqueci minha senha**: o e-mail chega (olhe o spam) e o link abre `poupamais-one.vercel.app/redefinir-senha…`;
+- trocar a foto de perfil;
+- instalar no celular: Android/Chrome, menu ⋮ → *Instalar app*; iPhone/Safari, Compartilhar → *Adicionar à Tela de Início*.
+
+O ensaio de 21/11 passou inteiro no site publicado.
+
+### Problemas no deploy
+
+| Sintoma | Causa provável |
+| --- | --- |
+| Render fica em "In progress" com *Waiting for internal health check … :10000/healthz* | Falta `PORT=8080` ou o Health Check Path ficou com o exemplo `/healthz`. Corrija, cancele e rode **Manual Deploy** de novo |
+| API não sobe: erro de conexão ou SSL no banco | `DB_URL` sem `jdbc:` ou sem `?sslmode=require`, ou pooling ligado no Neon |
+| Site abre, mas login dá erro e a API responde `UP` | `API_URL` errada na Vercel (com barra no fim ou `http`); corrija e faça **Redeploy** |
+| E-mail não chega | `MAIL_*` errados, porta diferente de 2525, `SPRING_APPLICATION_JSON` faltando, remetente não verificado no Brevo ou spam |
+| Link do e-mail abre o endereço errado | `FRONT_URL` no Render |
+| Primeira tela leva minutos | API dormindo (Free); confira se o job do cron-job.org está ativo |
 
 ## Problemas comuns
 
