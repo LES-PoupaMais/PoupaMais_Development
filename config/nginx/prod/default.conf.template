@@ -36,16 +36,22 @@ server {
     gzip_min_length 1024;
     gzip_types text/plain text/css text/javascript application/javascript application/json image/svg+xml;
 
-    # Sem add_header nas locations: lá ele apagaria estes
+    # Sem add_header nas locations: lá ele apagaria estes. Mesmos valores do next.config.ts do front (na Vercel é o
+    # Next que manda; aqui o nginx esconde os do Next na location e põe estes, para não sair cada cabeçalho duas vezes).
     add_header Strict-Transport-Security $hsts always;
     add_header X-Content-Type-Options    nosniff always;
     add_header X-Frame-Options           DENY always;
     add_header Referrer-Policy           strict-origin-when-cross-origin always;
+    add_header Permissions-Policy        "camera=(), microphone=(), geolocation=()" always;
 
     location / {
         set $front http://front:3000;
         proxy_pass $front;
         include /etc/nginx/snippets/proxy.conf;
+        proxy_hide_header X-Content-Type-Options;
+        proxy_hide_header X-Frame-Options;
+        proxy_hide_header Referrer-Policy;
+        proxy_hide_header Permissions-Policy;
     }
 }
 
