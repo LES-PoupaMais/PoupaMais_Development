@@ -1,0 +1,61 @@
+# "Como produção". Template: o entrypoint do nginx troca ${PORTA_HTTPS} e grava em conf.d/default.conf.
+# Certificado em /etc/nginx/certs (pasta certs/, gerada por "npm run certs").
+
+# HSTS vale para o host inteiro, em todas as portas. Mandado para "localhost", faria o navegador trocar por HTTPS
+# todo http://localhost:* da máquina (inclusive o modo dev). Por isso vai só no host próprio do modo
+# (PROD_HOST, padrão poupamais.localhost); IPs o navegador já ignora.
+map $host $hsts {
+    localhost "";
+    default   "max-age=31536000";
+}
+
+# HTTP -> HTTPS
+server {
+    listen 80 default_server;
+    server_name _;
+    return 301 https://$host:${PORTA_HTTPS}$request_uri;
+}
+
+server {
+    listen 443 ssl default_server;
+    http2 on;
+    server_name _;
+
+    ssl_certificate     /etc/nginx/certs/poupamais.crt;
+    ssl_certificate_key /etc/nginx/certs/poupamais.key;
+    ssl_protocols       TLSv1.2 TLSv1.3;
+    ssl_session_cache   shared:SSL:10m;
+    ssl_session_timeout 1h;
+
+    # Uploads (CSV e foto de perfil) até 2 MB, mais o envelope do multipart; igual ao back (max-request-size 3MB)
+    client_max_body_size 3m;
+
+    gzip on;
+    gzip_vary on;
+    gzip_proxied any;
+    gzip_min_length 1024;
+    gzip_types text/plain text/css text/javascript application/javascript application/json image/svg+xml;
+
+    # Sem add_header nas locations: lá ele apagaria estes
+    add_header Strict-Transport-Security $hsts always;
+    add_header X-Content-Type-Options    nosniff always;
+    add_header X-Frame-Options           DENY always;
+    add_header Referrer-Policy           strict-origin-when-cross-origin always;
+
+    location / {
+        set $front http://front:3000;
+        proxy_pass $front;
+        include /etc/nginx/snippets/proxy.conf;
+    }
+}
+
+# Mailpit (PROD_MAILPIT_PORT, só 127.0.0.1): faz o papel da caixa de e-mail do usuário
+server {
+    listen 8025;
+
+    location / {
+        set $mailpit http://mailpit:8025;
+        proxy_pass $mailpit;
+        include /etc/nginx/snippets/proxy.conf;
+    }
+}

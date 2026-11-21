@@ -1,0 +1,80 @@
+# Modo de desenvolvimento: "docker compose up" junta este arquivo com o docker-compose.yml sozinho.
+#   - front com "next dev" e hot reload sobre o código de FRONT_DIR (bind mount)
+#   - Swagger, Mailpit e Postgres acessíveis só em 127.0.0.1, sempre pelo nginx
+#   - painel de controle (config/painel) em 127.0.0.1
+services:
+  api:
+    environment:
+      # Link do e-mail de redefinição de senha: a porta do app no nginx (APP_URL troca, ex.: IP da rede)
+      FRONT_URL: ${APP_URL:-http://localhost:${APP_PORT:-8000}}
+      CORS_ORIGINS: http://localhost:${APP_PORT:-8000}
+      SWAGGER_HABILITADO: "true"
+
+  front:
+    build:
+      # Contexto = só os Dockerfiles; o código do front entra pelo contexto nomeado "app" (só os arquivos copiados
+      # são transferidos, então node_modules e .next do host ficam de fora sem precisar de .dockerignore no front)
+      context: ./config/front
+      dockerfile: Dockerfile.dev
+      additional_contexts:
+        app: ${FRONT_DIR:-../PoupaMais_FrontEnd}
+    user: "1000:1000"
+    volumes:
+      - ${FRONT_DIR:-../PoupaMais_FrontEnd}:/app
+      # Volumes anônimos: node_modules (Linux/musl) e .next do container não se misturam com os do host
+      - /app/node_modules
+      - /app/.next
+    environment:
+      # Watcher por polling desligado: no WSL o bind mount vem do ext4 e o inotify funciona
+      WATCHPACK_POLLING: "false"
+      # Endereços além de localhost que o "next dev" deixa carregar os scripts (ex.: IP da rede, para o celular)
+      ORIGENS_DEV_PERMITIDAS: ${ORIGENS_DEV_PERMITIDAS:-}
+    healthcheck:
+      # Porta aberta basta: um GET obrigaria o "next dev" a compilar a página a cada verificação
+      test: ["CMD", "nc", "-z", "127.0.0.1", "3000"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+      start_period: 20s
+
+  nginx:
+    ports:
+      # App: em todas as interfaces (dá para abrir de outro aparelho na rede)
+      - "${APP_PORT:-8000}:80"
+      # Ferramentas: só nesta máquina
+      - "127.0.0.1:${SWAGGER_PORT:-8001}:8081"
+      - "127.0.0.1:${MAILPIT_PORT:-8002}:8025"
+      - "127.0.0.1:${DB_PORT:-5434}:5432"
+    environment:
+      PORTA_SWAGGER: ${SWAGGER_PORT:-8001}
+    volumes:
+      - ./config/nginx/dev:/etc/nginx/templates:ro
+      - ./config/nginx/stream-dev:/etc/nginx/stream.d:ro
+
+  # Painel: status, saúde, links, ações e logs ao vivo dos serviços deste projeto
+  painel:
+    image: node:26-alpine
+    init: true
+    read_only: true
+    working_dir: /app
+    command: ["node", "server.js"]
+    environment:
+      # Portas do host, para os links do services.json
+      APP_PORT: ${APP_PORT:-8000}
+      SWAGGER_PORT: ${SWAGGER_PORT:-8001}
+      MAILPIT_PORT: ${MAILPIT_PORT:-8002}
+      DB_PORT: ${DB_PORT:-5434}
+      DB_USER: ${DB_USER:-poupamais}
+      DB_PASSWORD: ${DB_PASSWORD:-poupamais}
+    volumes:
+      - ./config/painel:/app:ro
+      - /var/run/docker.sock:/var/run/docker.sock
+    ports:
+      # Só localhost: com o socket do Docker, o painel controla a máquina
+      - "127.0.0.1:${PAINEL_PORT:-9000}:9000"
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://127.0.0.1:9000/"]
+      interval: 10s
+      timeout: 3s
+      retries: 3
+    networks: [borda]
