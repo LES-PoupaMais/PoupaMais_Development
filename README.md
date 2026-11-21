@@ -85,8 +85,11 @@ para recriar o volume de `node_modules`.
 
 ### Modo como produção — `npm run prod` (projeto `poupamais-prod`)
 
-- `front` em build de produção: `config/front/Dockerfile`, multi-stage (`next build` → imagem só com as
-  dependências de produção e o `.next`), `next start`, usuário `node` (não-root), `NODE_ENV=production`;
+- `front` em build de produção: `config/front/Dockerfile`, multi-stage, com a saída **standalone** do Next
+  (`NEXT_OUTPUT=standalone` no build liga `output: 'standalone'` no `next.config.ts` do front). A imagem final leva só
+  `.next/standalone` (o `server.js` e os arquivos de `node_modules` que o servidor usa), `.next/static` e `public`, e roda
+  `node server.js` como usuário `node` (não-root), `NODE_ENV=production`; só `.next/cache` é gravável. De ~1,15 GB para
+  ~0,3 GB (`docker images`, 21/11). Na Vercel e no CI do front a variável não existe e o build é o normal (`next start`);
 - `api` com `SWAGGER_HABILITADO=false`, `FRONT_URL`/`CORS_ORIGINS` em HTTPS;
 - nginx com **HTTPS**, redirecionamento HTTP → HTTPS, HSTS, `X-Content-Type-Options: nosniff`,
   `X-Frame-Options: DENY`, `Referrer-Policy`, gzip e `client_max_body_size 3m` (uploads de até 2 MB + envelope
@@ -231,6 +234,11 @@ npm run e2e:down                    # aqui (apaga o banco da pilha)
 
 `E2E_FRONT_PORT` (padrão 3130) precisa ser a mesma porta do front da suíte: é para ela que apontam o link do e-mail
 de senha e o CORS da API. `npm run e2e:reset` recria a pilha do zero.
+
+**No CI do front:** o job "Testes contra a API real" (`.github/workflows/ci.yml` do PoupaMais_FrontEnd) faz o checkout
+deste repositório e do `PoupaMais_BackEnd` (branch `development` dos dois) ao lado do front, como na árvore do início,
+roda `npm run e2e:up` aqui, a suíte lá e `npm run e2e:down` no fim. Mudança neste arquivo ou nas portas da pilha E2E
+precisa continuar valendo para esse job.
 
 ## Estrutura
 

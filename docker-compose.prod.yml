@@ -1,6 +1,6 @@
 # Modo "como produção", local:
 #   docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d --build --wait   (ou: npm run prod)
-# - Next em build de produção (next build + next start), imagem multi-stage com usuário não-root
+# - Next em build de produção (saída standalone: node server.js), imagem multi-stage com usuário não-root
 # - nginx com HTTPS (certificado de scripts/gerar-certificados.sh), redirecionamento HTTP -> HTTPS,
 #   HSTS, nosniff, X-Frame-Options e gzip
 # - API com o Swagger desligado; sem painel, sem Postgres no host
