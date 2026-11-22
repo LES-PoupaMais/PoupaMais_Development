@@ -16,3 +16,6 @@ npm-debug.log*
 # Sistema
 .DS_Store
 Thumbs.db
+
+# Passagem de trabalho entre agentes de IA (local, não versionar)
+HANDOFF.md
